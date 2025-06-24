@@ -1,2 +1,2 @@
-mod parser;
-mod tokens;
+pub mod parser;
+pub mod tokens;
