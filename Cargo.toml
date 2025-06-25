@@ -4,3 +4,4 @@ members = [ "rune_cli", "rune_core","rune_parser"]
 
 [workspace.dependencies]
 rune_parser = { path = "rune_parser" }
+rune_core = { path = "rune_core" }
