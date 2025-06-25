@@ -608,4 +608,42 @@ mod tests {
             panic!("Expected if expression");
         }
     }
+
+    #[test]
+    fn if_bang_cond() {
+        let mut parser =
+            Parser::new(String::from("if !cond1 {} else {}")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
+        assert_eq!(statements.len(), 1);
+
+        if let Expr::IfElse {
+            condition,
+            then_branch,
+            else_branch,
+        } = &statements[0]
+        {
+            assert_eq!(
+                **condition,
+                Expr::Unary {
+                    operator: UnaryOp::Not,
+                    operand: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                }
+            );
+            if let Expr::Block(block_statements) = then_branch.as_ref() {
+                assert_eq!(block_statements.len(), 0);
+            } else {
+                panic!("Expected block expression for then branch");
+            }
+            assert!(else_branch.is_some());
+            if let Some(else_expr) = else_branch {
+                if let Expr::Block(block_statements) = else_expr.as_ref() {
+                    assert_eq!(block_statements.len(), 0);
+                } else {
+                    panic!("Expected block expression for else branch");
+                }
+            }
+        } else {
+            panic!("Expected if expression");
+        }
+    }
 }
