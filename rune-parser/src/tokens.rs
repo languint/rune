@@ -1,5 +1,7 @@
 use logos::Logos;
 
+use crate::tokens;
+
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
@@ -83,4 +85,8 @@ pub enum Token {
 
     #[token("let")]
     KeywordLet,
+    #[token("if")]
+    KeywordIf,
+    #[token("else")]
+    KeywordElse,
 }

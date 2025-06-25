@@ -23,6 +23,11 @@ pub enum Expr {
         identifier: String,
         value: Box<Expr>,
     },
+    IfElse {
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Option<Box<Expr>>,
+    },
     Block(Vec<Expr>),
 }
 
@@ -142,43 +147,10 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr> {
+        if let Some(Token::KeywordIf) = self.peek() {
+            return self.if_else();
+        }
         self.assignment()
-    }
-
-    fn assignment(&mut self) -> Result<Expr> {
-        // Check for `let`
-        if self.match_token(&Token::KeywordLet) {
-            if let Some(Token::Identifier(name)) = self.peek().cloned() {
-                self.advance(); // consume identifier
-
-                if !self.match_token(&Token::Equals) {
-                    return Err(anyhow!("Expected '=' after identifier in let declaration"));
-                }
-
-                let value = self.assignment()?;
-                return Ok(Expr::LetDeclaration {
-                    identifier: name,
-                    value: Box::new(value),
-                });
-            } else {
-                return Err(anyhow!("Expected identifier after 'let'"));
-            }
-        }
-
-        let expr = self.or()?;
-
-        if self.match_token(&Token::Equals) {
-            if let Expr::Literal(Nodes::Identifier(name)) = expr {
-                let value = self.assignment()?;
-                return Ok(Expr::Assignment {
-                    identifier: name,
-                    value: Box::new(value),
-                });
-            }
-            return Err(anyhow!("Invalid assignment target"));
-        }
-
-        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Expr> {
@@ -226,6 +198,7 @@ impl Parser {
 
                     Ok(Expr::Block(statements))
                 }
+
                 _ => Err(anyhow!("Unexpected token: {:?}", token)),
             }
         } else {
@@ -398,6 +371,94 @@ impl Parser {
     }
 }
 
+impl Parser {
+    fn assignment(&mut self) -> Result<Expr> {
+        // Check for `let`
+        if self.match_token(&Token::KeywordLet) {
+            if let Some(Token::Identifier(name)) = self.peek().cloned() {
+                self.advance(); // consume identifier
+
+                if !self.match_token(&Token::Equals) {
+                    return Err(anyhow!("Expected '=' after identifier in let declaration"));
+                }
+
+                let value = self.assignment()?;
+                return Ok(Expr::LetDeclaration {
+                    identifier: name,
+                    value: Box::new(value),
+                });
+            } else {
+                return Err(anyhow!("Expected identifier after 'let'"));
+            }
+        }
+
+        let expr = self.or()?;
+
+        if self.match_token(&Token::Equals) {
+            if let Expr::Literal(Nodes::Identifier(name)) = expr {
+                let value = self.assignment()?;
+                return Ok(Expr::Assignment {
+                    identifier: name,
+                    value: Box::new(value),
+                });
+            }
+            return Err(anyhow!("Invalid assignment target"));
+        }
+
+        Ok(expr)
+    }
+}
+
+impl Parser {
+    fn if_else(&mut self) -> Result<Expr> {
+        if !self.match_token(&Token::KeywordIf) {
+            return Err(anyhow!("Expected 'if' keyword"));
+        }
+
+        let condition = self.expression()?;
+
+        if !self.match_token(&Token::LeftBrace) {
+            return Err(anyhow!("Expected '{{' after 'if' condition"));
+        }
+
+        let mut then_statements = Vec::new();
+        while !self.match_token(&Token::RightBrace) && !self.is_at_end() {
+            then_statements.push(self.statement()?);
+        }
+
+        if self.previous() != Some(&Token::RightBrace) {
+            return Err(anyhow!("Expected '}}' after 'if' block"));
+        }
+
+        let then_branch = Expr::Block(then_statements);
+
+        let else_branch = if self.match_token(&Token::KeywordElse) {
+            if !self.match_token(&Token::LeftBrace) {
+                return Err(anyhow!("Expected '{{' after 'else'"));
+            }
+
+            let mut else_statements = Vec::new();
+            while !self.match_token(&Token::RightBrace) && !self.is_at_end() {
+                else_statements.push(self.statement()?);
+            }
+
+            if self.previous() != Some(&Token::RightBrace) {
+                return Err(anyhow!("Expected '}}' after 'else' block"));
+            }
+
+            Some(Box::new(Expr::Block(else_statements)))
+        } else {
+            None
+        };
+
+        Ok(Expr::IfElse {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,14 +526,86 @@ mod tests {
 
     #[test]
     fn test_block_with_braces() {
-        let mut parser = Parser::new(String::from("{ let x = 10; x + 5 }")).unwrap();
-        let statements = parser.parse().unwrap();
+        let mut parser =
+            Parser::new(String::from("{ let x = 10; x + 5 }")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
         assert_eq!(statements.len(), 1);
 
         if let Expr::Block(block_statements) = &statements[0] {
             assert_eq!(block_statements.len(), 2);
         } else {
             panic!("Expected block expression");
+        }
+    }
+
+    #[test]
+    fn if_block() {
+        let mut parser =
+            Parser::new(String::from("if cond1 == cond2 {}")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
+        assert_eq!(statements.len(), 1);
+
+        if let Expr::IfElse {
+            condition,
+            then_branch,
+            else_branch,
+        } = &statements[0]
+        {
+            assert_eq!(
+                **condition,
+                Expr::Binary {
+                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                    operator: BinaryOp::Equal,
+                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".to_string()))),
+                }
+            );
+            if let Expr::Block(block_statements) = then_branch.as_ref() {
+                assert_eq!(block_statements.len(), 0);
+            } else {
+                panic!("Expected block expression");
+            }
+            assert!(else_branch.is_none());
+        } else {
+            panic!("Expected if expression");
+        }
+    }
+
+    #[test]
+    fn else_block() {
+        let mut parser =
+            Parser::new(String::from("if cond1 == cond2 {} else {}")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
+        assert_eq!(statements.len(), 1);
+
+        if let Expr::IfElse {
+            condition,
+            then_branch,
+            else_branch,
+        } = &statements[0]
+        {
+            assert_eq!(
+                **condition,
+                Expr::Binary {
+                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                    operator: BinaryOp::Equal,
+                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".to_string()))),
+                }
+            );
+            if let Expr::Block(block_statements) = then_branch.as_ref() {
+                assert_eq!(block_statements.len(), 0);
+            } else {
+                panic!("Expected block expression for then branch");
+            }
+            assert!(else_branch.is_some());
+            if let Some(else_expr) = else_branch {
+                if let Expr::Block(block_statements) = else_expr.as_ref() {
+                    assert_eq!(block_statements.len(), 0);
+                } else {
+                    panic!("Expected block expression for else branch");
+                }
+            }
+        } else {
+            panic!("Expected if expression");
         }
     }
 }
