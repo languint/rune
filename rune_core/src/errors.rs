@@ -10,6 +10,7 @@ pub enum CodeGenError {
     StringError(String),
     OperatorNotSupported(String, String),
     InternalError(String),
+    StoreError(String),
 }
 
 impl fmt::Display for CodeGenError {
@@ -34,10 +35,11 @@ pub fn get_print_error(error: &CodeGenError) -> String {
         ),
         CodeGenError::TypeMismatchCustom(msg) => format!("(C002): Type mismatch: {}", msg),
         CodeGenError::InvalidOperation(op) => format!("(C003): Invalid operation `{}`", op),
-        CodeGenError::NoFunction => format!("(C004): No function found"),
+        CodeGenError::NoFunction => "(C004): No function found".into(),
         CodeGenError::StringError(msg) => format!("(C005): String error: {}", msg),
         CodeGenError::OperatorNotSupported(op1, op2) => {
             format!("(C006): Operator `{}` not supported for `{}`", op1, op2)
         }
+        CodeGenError::StoreError(var) => format!("(C007): Store error for variable `{}`", var),
     }
 }

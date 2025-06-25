@@ -4,10 +4,8 @@ use inkwell::IntPredicate;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
-use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{
-    BasicValue, BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue,
-};
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue};
 use rune_parser::nodes::Nodes;
 use rune_parser::parser::BinaryOp;
 use rune_parser::parser::Expr;
@@ -59,7 +57,13 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Return 0 from main
         let zero = self.context.i32_type().const_int(0, false);
-        self.builder.build_return(Some(&zero));
+        let built_return = self.builder.build_return(Some(&zero));
+
+        if built_return.is_err() {
+            return Err(CodeGenError::TypeMismatchCustom(
+                "Return must be an integer".to_string(),
+            ));
+        }
 
         Ok(())
     }
@@ -117,12 +121,9 @@ impl<'ctx> CodeGen<'ctx> {
             Nodes::String(value) => {
                 let string_val = self.builder.build_global_string_ptr(value, "str");
 
-                if string_val.is_err() {
-                    Err(CodeGenError::StringError(
-                        string_val.err().unwrap().to_string(),
-                    ))
-                } else {
-                    Ok(string_val.unwrap().as_pointer_value().into())
+                match string_val {
+                    Ok(global_val) => Ok(global_val.as_pointer_value().into()),
+                    Err(err) => Err(CodeGenError::StringError(err.to_string())),
                 }
             }
             Nodes::Identifier(name) => Err(CodeGenError::InternalError(format!(
@@ -201,7 +202,7 @@ impl<'ctx> CodeGen<'ctx> {
         operator: &BinaryOp,
         right: PointerValue<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>, CodeGenError> {
-        let result = match operator {
+        match operator {
             BinaryOp::Add => {
                 let result = self.builder.build_int_add(left, right, "add").unwrap();
                 Ok(BasicValueEnum::PointerValue(result))
@@ -239,9 +240,7 @@ impl<'ctx> CodeGen<'ctx> {
                 format!("{:?}", operator),
                 format!("{:?} | {:?}", left.get_type(), right.get_type()),
             )),
-        };
-
-        result
+        }
     }
 
     fn compile_int_binary_op(
@@ -424,14 +423,15 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<BasicValueEnum<'ctx>, CodeGenError> {
         let val = self.compile_expression(value)?;
 
-        // Create alloca for the variable
         let var_type = val.get_type();
         let alloca = self.builder.build_alloca(var_type, identifier).unwrap();
 
-        // Store the initial value
-        self.builder.build_store(alloca, val);
+        let result = self.builder.build_store(alloca, val);
 
-        // Remember the variable
+        if result.is_err() {
+            return Err(CodeGenError::StoreError(identifier.to_string()));
+        }
+
         self.variables
             .insert(identifier.to_string(), (alloca, var_type));
 
@@ -448,7 +448,6 @@ impl<'ctx> CodeGen<'ctx> {
 
         let condition_val = self.compile_expression(condition)?;
 
-        // Convert condition to i1 if it's not already
         let condition_bool = match condition_val {
             BasicValueEnum::IntValue(int_val) => {
                 if int_val.get_type().get_bit_width() == 1 {
@@ -471,28 +470,46 @@ impl<'ctx> CodeGen<'ctx> {
         let else_bb = self.context.append_basic_block(function, "else");
         let merge_bb = self.context.append_basic_block(function, "ifcont");
 
-        // Build conditional branch
-        self.builder
-            .build_conditional_branch(condition_bool, then_bb, else_bb);
+        let built_cond_branch =
+            self.builder
+                .build_conditional_branch(condition_bool, then_bb, else_bb);
 
-        // Build then block
+        if built_cond_branch.is_err() {
+            return Err(CodeGenError::TypeMismatchCustom(
+                "Condition must be an integer".to_string(),
+            ));
+        }
+
         self.builder.position_at_end(then_bb);
         let then_val = self.compile_expression(then_branch)?;
-        self.builder.build_unconditional_branch(merge_bb);
+        let built_unconditional_branch = self.builder.build_unconditional_branch(merge_bb);
+
+        if built_unconditional_branch.is_err() {
+            return Err(CodeGenError::TypeMismatchCustom(
+                "Branch must be an integer".to_string(),
+            ));
+        }
+
         let then_bb_end = self.builder.get_insert_block().unwrap();
 
-        // Build else block
         self.builder.position_at_end(else_bb);
         let else_val = if let Some(else_expr) = else_branch {
             self.compile_expression(else_expr)?
         } else {
-            // Default value for else branch
             self.context.i64_type().const_int(0, false).into()
         };
-        self.builder.build_unconditional_branch(merge_bb);
+
+        let built_unconditional_branch = self.builder.build_unconditional_branch(merge_bb);
+
+        if built_unconditional_branch.is_err() {
+            return Err(CodeGenError::TypeMismatchCustom(
+                "Branch must be an integer".to_string(),
+            ));
+        }
+
         let else_bb_end = self.builder.get_insert_block().unwrap();
 
-        // Build merge block with phi node
+        // merge block with phi node
         self.builder.position_at_end(merge_bb);
 
         // Only create phi if both branches have the same type
@@ -504,7 +521,6 @@ impl<'ctx> CodeGen<'ctx> {
             phi.add_incoming(&[(&then_val, then_bb_end), (&else_val, else_bb_end)]);
             Ok(phi.as_basic_value())
         } else {
-            // If types don't match, just return the then value
             Ok(then_val)
         }
     }

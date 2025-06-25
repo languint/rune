@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::errors::ParserError;
 use crate::nodes::Nodes;
 use crate::tokens::Token;
@@ -31,42 +33,39 @@ pub enum Expr {
     Block(Vec<Expr>),
 }
 
-impl ToString for Expr {
-    fn to_string(&self) -> String {
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Literal(node) => format!("{:?}", node),
+            Expr::Literal(node) => write!(f, "{:?}", node),
             Expr::Binary {
                 left,
                 operator,
                 right,
-            } => format!(
-                "({} {} {})",
-                left.to_string(),
-                format!("{:?}", operator),
-                right.to_string()
-            ),
+            } => write!(f, "({} {:?} {})", left, operator, right),
             Expr::Unary { operator, operand } => {
-                format!("{}{}", format!("{:?}", operator), operand.to_string())
+                write!(f, "{:?}{}", operator, operand)
             }
             Expr::Assignment { identifier, value } => {
-                format!("{} = {}", identifier, value.to_string())
+                write!(f, "{} = {}", identifier, value)
             }
             Expr::LetDeclaration { identifier, value } => {
-                format!("let {} = {}", identifier, value.to_string())
+                write!(f, "let {} = {}", identifier, value)
             }
             Expr::IfElse {
                 condition,
                 then_branch,
                 else_branch,
-            } => format!(
+            } => write!(
+                f,
                 "if {} {{ {} }} else {{ {} }}",
-                condition.to_string(),
-                then_branch.to_string(),
+                condition,
+                then_branch,
                 else_branch
                     .as_ref()
                     .map_or("".to_string(), |e| e.to_string())
             ),
-            Expr::Block(exprs) => format!(
+            Expr::Block(exprs) => write!(
+                f,
                 "{{ {} }}",
                 exprs
                     .iter()
@@ -255,7 +254,7 @@ impl Parser {
                 _ => Err(ParserError::UnexpectedToken(format!("{:?}", token))),
             }
         } else {
-            return Err(ParserError::UnexpectedEndOfInput);
+            Err(ParserError::UnexpectedEndOfInput)
         }
     }
 }
