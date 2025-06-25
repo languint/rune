@@ -439,19 +439,6 @@ impl Parser {
 }
 
 impl Parser {
-    #[inline]
-    fn is_type(t: &Token) -> bool {
-        match t {
-            Token::TypeF32
-            | Token::TypeF64
-            | Token::TypeI32
-            | Token::TypeI64
-            | Token::TypeBool
-            | Token::TypeString => true,
-            _ => false,
-        }
-    }
-
     fn parse_type(&mut self) -> Result<Types, ParserError> {
         if let Some(token) = self.peek().cloned() {
             match token {
