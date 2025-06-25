@@ -5,7 +5,6 @@ pub enum Nodes {
     String(String),
     Boolean(bool),
     Identifier(String),
-    Assignment(Box<Nodes>, Box<Nodes>),
 }
 
 impl Nodes {
