@@ -9,6 +9,7 @@ use inkwell::values::{BasicValueEnum, FloatValue, FunctionValue, IntValue, Point
 use rune_parser::nodes::Nodes;
 use rune_parser::parser::BinaryOp;
 use rune_parser::parser::Expr;
+use rune_parser::parser::Types;
 use rune_parser::parser::UnaryOp;
 use std::collections::HashMap;
 
@@ -92,9 +93,11 @@ impl<'ctx> CodeGen<'ctx> {
             } => self.compile_binary_op(left, operator, right),
             Expr::Unary { operator, operand } => self.compile_unary_op(operator, operand),
             Expr::Assignment { identifier, value } => self.compile_assignment(identifier, value),
-            Expr::LetDeclaration { identifier, value } => {
-                self.compile_let_declaration(identifier, value)
-            }
+            Expr::LetDeclaration {
+                identifier,
+                value,
+                var_type,
+            } => self.compile_let_declaration(identifier, value, var_type),
             Expr::IfElse {
                 condition,
                 then_branch,
@@ -420,11 +423,22 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         identifier: &str,
         value: &Expr,
+        var_type: &Option<Types>,
     ) -> Result<BasicValueEnum<'ctx>, CodeGenError> {
         let val = self.compile_expression(value)?;
 
-        let var_type = val.get_type();
-        let alloca = self.builder.build_alloca(var_type, identifier).unwrap();
+        // Use the specified type instead of inferring from value
+        let llvm_type = match var_type {
+            Some(Types::I32) => self.context.i32_type().into(),
+            Some(Types::I64) => self.context.i64_type().into(),
+            Some(Types::F32) => self.context.f32_type().into(),
+            Some(Types::F64) => self.context.f64_type().into(),
+            Some(Types::Bool) => self.context.bool_type().into(),
+            Some(Types::String) => self.context.ptr_type(AddressSpace::default()).into(),
+            None => self.context.i64_type().into(),
+        };
+
+        let alloca = self.builder.build_alloca(llvm_type, identifier).unwrap();
 
         let result = self.builder.build_store(alloca, val);
 
@@ -433,7 +447,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         self.variables
-            .insert(identifier.to_string(), (alloca, var_type));
+            .insert(identifier.to_string(), (alloca, llvm_type));
 
         Ok(val)
     }
@@ -591,6 +605,25 @@ mod tests {
         let mut parser =
             Parser::new("let x = 5; if x > 3 { let y = 10 } else { let y = 20 }".to_string())
                 .unwrap();
+        let statements = parser.parse().unwrap();
+
+        codegen.compile_statements(&statements).unwrap();
+
+        let result = codegen.module.verify();
+
+        dbg!(&result);
+        if !result.is_ok() {
+            dbg!(result.unwrap_err());
+            panic!("Module verification failed");
+        }
+    }
+
+    #[test]
+    fn explicit_type_annotation() {
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "test");
+
+        let mut parser = Parser::new("let x: i64 = 5;".to_string()).unwrap();
         let statements = parser.parse().unwrap();
 
         codegen.compile_statements(&statements).unwrap();

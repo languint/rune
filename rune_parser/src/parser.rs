@@ -6,6 +6,16 @@ use crate::tokens::Token;
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Types {
+    I32,
+    I64,
+    Bool,
+    F32,
+    F64,
+    String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Nodes),
     Binary {
@@ -23,6 +33,7 @@ pub enum Expr {
     },
     LetDeclaration {
         identifier: String,
+        var_type: Option<Types>,
         value: Box<Expr>,
     },
     IfElse {
@@ -48,8 +59,12 @@ impl Display for Expr {
             Expr::Assignment { identifier, value } => {
                 write!(f, "{} = {}", identifier, value)
             }
-            Expr::LetDeclaration { identifier, value } => {
-                write!(f, "let {} = {}", identifier, value)
+            Expr::LetDeclaration {
+                identifier,
+                value,
+                var_type,
+            } => {
+                write!(f, "let {}: {:?} = {}", identifier, var_type, value)
             }
             Expr::IfElse {
                 condition,
@@ -424,11 +439,84 @@ impl Parser {
 }
 
 impl Parser {
+    #[inline]
+    fn is_type(t: &Token) -> bool {
+        match t {
+            Token::TypeF32
+            | Token::TypeF64
+            | Token::TypeI32
+            | Token::TypeI64
+            | Token::TypeBool
+            | Token::TypeString => true,
+            _ => false,
+        }
+    }
+
+    fn parse_type(&mut self) -> Result<Types, ParserError> {
+        if let Some(token) = self.peek().cloned() {
+            match token {
+                Token::Identifier(type_name) => {
+                    self.advance();
+                    match type_name.as_str() {
+                        "i32" => Ok(Types::I32),
+                        "i64" => Ok(Types::I64),
+                        "bool" => Ok(Types::Bool),
+                        "f32" => Ok(Types::F32),
+                        "f64" => Ok(Types::F64),
+                        "String" => Ok(Types::String),
+                        _ => Err(ParserError::UnexpectedToken(format!(
+                            "unknown type: {}",
+                            type_name
+                        ))),
+                    }
+                }
+                Token::TypeI32 => {
+                    self.advance();
+                    Ok(Types::I32)
+                }
+                Token::TypeI64 => {
+                    self.advance();
+                    Ok(Types::I64)
+                }
+                Token::TypeBool => {
+                    self.advance();
+                    Ok(Types::Bool)
+                }
+                Token::TypeF32 => {
+                    self.advance();
+                    Ok(Types::F32)
+                }
+                Token::TypeF64 => {
+                    self.advance();
+                    Ok(Types::F64)
+                }
+                Token::TypeString => {
+                    self.advance();
+                    Ok(Types::String)
+                }
+                _ => {
+                    dbg!(self.peek().cloned());
+                    Err(ParserError::ExpectedToken("type".into()))
+                }
+            }
+        } else {
+            dbg!(self.peek().cloned());
+            Err(ParserError::ExpectedToken("type".into()))
+        }
+    }
+
     fn assignment(&mut self) -> Result<Expr, ParserError> {
         // Check for `let`
         if self.match_token(&Token::KeywordLet) {
             if let Some(Token::Identifier(name)) = self.peek().cloned() {
                 self.advance(); // consume identifier
+
+                // Check for optional type annotation
+                let var_type = if self.match_token(&Token::Colon) {
+                    Some(self.parse_type()?)
+                } else {
+                    None
+                };
 
                 if !self.match_token(&Token::Equals) {
                     return Err(ParserError::ExpectedAfterCustom(
@@ -441,6 +529,7 @@ impl Parser {
                 let value = self.assignment()?;
                 return Ok(Expr::LetDeclaration {
                     identifier: name,
+                    var_type,
                     value: Box::new(value),
                 });
             } else {
@@ -538,7 +627,23 @@ mod tests {
             statements[0],
             Expr::LetDeclaration {
                 identifier: "x".into(),
+                var_type: None,
                 value: Box::new(Expr::Literal(Nodes::new_integer(10))),
+            }
+        );
+    }
+
+    #[test]
+    fn test_let_declaration_with_type() {
+        let mut parser = Parser::new(String::from("let x: i32 = 10")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
+        assert_eq!(statements.len(), 1);
+        assert_eq!(
+            statements[0],
+            Expr::LetDeclaration {
+                identifier: "x".into(),
+                var_type: Some(Types::I32),
+                value: Box::new(Expr::Literal(Nodes::Integer(10))),
             }
         );
     }
@@ -568,6 +673,7 @@ mod tests {
             statements[0],
             Expr::LetDeclaration {
                 identifier: "x".into(),
+                var_type: None,
                 value: Box::new(Expr::Literal(Nodes::Integer(10))),
             }
         );
@@ -576,6 +682,7 @@ mod tests {
             statements[1],
             Expr::LetDeclaration {
                 identifier: "y".into(),
+                var_type: None,
                 value: Box::new(Expr::Literal(Nodes::new_integer(20))),
             }
         );
@@ -718,5 +825,25 @@ mod tests {
         let result = Parser::new(String::from("@"));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), ParserError::UnexpectedCharacter('@'));
+    }
+
+    #[test]
+    fn type_annotation() {
+        let mut parser = Parser::new(String::from("let x: i32 = 42;")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
+        assert_eq!(statements.len(), 1);
+
+        if let Expr::LetDeclaration {
+            identifier,
+            value,
+            var_type,
+        } = &statements[0]
+        {
+            assert_eq!(identifier, "x");
+            assert_eq!(var_type, &Some(Types::I32));
+            assert_eq!(value, &Box::new(Expr::Literal(Nodes::Integer(42))));
+        } else {
+            panic!("Expected let expression");
+        }
     }
 }

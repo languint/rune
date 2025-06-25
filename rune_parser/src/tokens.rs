@@ -14,6 +14,8 @@ pub enum Token {
     Slash,
     #[token("%")]
     Percent,
+    #[token("&")]
+    Ampersand,
 
     // Assignment and equality
     #[token("=")]
@@ -52,6 +54,8 @@ pub enum Token {
     RightBrace,
     #[token(";")]
     Semicolon,
+    #[token(":")]
+    Colon,
 
     #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     Integer(i64),
@@ -95,4 +99,17 @@ pub enum Token {
     Arrow,
     #[token("=>")]
     BigArrow,
+
+    #[token("i32")]
+    TypeI32,
+    #[token("i64")]
+    TypeI64,
+    #[token("bool")]
+    TypeBool,
+    #[token("f32")]
+    TypeF32,
+    #[token("f64")]
+    TypeF64,
+    #[token("string")]
+    TypeString,
 }
