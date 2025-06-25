@@ -1,6 +1,6 @@
-use crate::nodes::Nodes;
+use crate::errors::{ParserError, get_print_error};
 use crate::tokens::Token;
-use anyhow::{Result, anyhow};
+use crate::{errors, nodes::Nodes};
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,13 +54,14 @@ pub enum UnaryOp {
     Not,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
 }
 
 impl Parser {
-    pub fn new(input: String) -> Result<Self> {
+    pub fn new(input: String) -> Result<Self, ParserError> {
         let mut lexer = Token::lexer(&input);
         let mut tokens = Vec::new();
 
@@ -74,14 +75,16 @@ impl Parser {
                     } else if let Ok(num) = slice.parse::<f64>() {
                         tokens.push(Token::Float(num));
                     } else if slice.starts_with('"') && slice.ends_with('"') {
-                        let string_content = slice[1..slice.len() - 1].to_string();
+                        let string_content = slice[1..slice.len() - 1].into();
                         tokens.push(Token::String(string_content));
                     } else if slice == "true" || slice == "false" {
                         tokens.push(Token::Boolean(slice == "true"));
                     } else if slice.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                        tokens.push(Token::Identifier(slice.to_string()));
+                        tokens.push(Token::Identifier(slice.into()));
                     } else {
-                        return Err(anyhow!("Unexpected character: {}", slice));
+                        return Err(ParserError::UnexpectedCharacter(
+                            slice.chars().next().unwrap(),
+                        ));
                     }
                 }
             }
@@ -127,17 +130,20 @@ impl Parser {
 }
 
 impl Parser {
-    pub fn parse(&mut self) -> Result<Vec<Expr>> {
+    pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
         let mut statements = Vec::new();
 
-        while !self.is_at_end() {
+        loop {
+            if self.is_at_end() {
+                break;
+            }
             statements.push(self.statement()?);
         }
 
         Ok(statements)
     }
 
-    fn statement(&mut self) -> Result<Expr> {
+    fn statement(&mut self) -> Result<Expr, ParserError> {
         let expr = self.expression()?;
 
         // Consume `;`
@@ -146,14 +152,14 @@ impl Parser {
         Ok(expr)
     }
 
-    fn expression(&mut self) -> Result<Expr> {
+    fn expression(&mut self) -> Result<Expr, ParserError> {
         if let Some(Token::KeywordIf) = self.peek() {
             return self.if_else();
         }
         self.assignment()
     }
 
-    fn primary(&mut self) -> Result<Expr> {
+    fn primary(&mut self) -> Result<Expr, ParserError> {
         if let Some(token) = self.peek().cloned() {
             match token {
                 Token::Integer(value) => {
@@ -180,7 +186,7 @@ impl Parser {
                     self.advance(); // consume `(`
                     let expr = self.expression()?;
                     if !self.match_token(&Token::RightParen) {
-                        return Err(anyhow!("Expected ')' after expression"));
+                        return Err(ParserError::ExpectedAfter(")".into(), "expression".into()));
                     }
                     Ok(expr)
                 }
@@ -193,22 +199,22 @@ impl Parser {
                     }
 
                     if self.previous() != Some(&Token::RightBrace) {
-                        return Err(anyhow!("Expected '}}' after block"));
+                        return Err(ParserError::ExpectedAfter("}".into(), "block".into()));
                     }
 
                     Ok(Expr::Block(statements))
                 }
 
-                _ => Err(anyhow!("Unexpected token: {:?}", token)),
+                _ => Err(ParserError::UnexpectedToken(format!("{:?}", token))),
             }
         } else {
-            Err(anyhow!("Unexpected end of input"))
+            return Err(ParserError::UnexpectedEndOfInput);
         }
     }
 }
 
 impl Parser {
-    fn term(&mut self) -> Result<Expr> {
+    fn term(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.factor()?;
 
         while let Some(op) = self.match_term_op() {
@@ -223,7 +229,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr> {
+    fn factor(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.unary()?;
 
         while let Some(op) = self.match_factor_op() {
@@ -238,7 +244,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr> {
+    fn unary(&mut self) -> Result<Expr, ParserError> {
         if let Some(op) = self.match_unary_op() {
             let expr = self.unary()?;
             return Ok(Expr::Unary {
@@ -252,7 +258,7 @@ impl Parser {
 }
 
 impl Parser {
-    fn or(&mut self) -> Result<Expr> {
+    fn or(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.and()?;
 
         while self.match_token(&Token::Or) {
@@ -267,7 +273,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn and(&mut self) -> Result<Expr> {
+    fn and(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.equality()?;
 
         while self.match_token(&Token::And) {
@@ -282,7 +288,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn equality(&mut self) -> Result<Expr> {
+    fn equality(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.comparison()?;
 
         while let Some(op) = self.match_equality_op() {
@@ -297,7 +303,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr> {
+    fn comparison(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.term()?;
 
         while let Some(op) = self.match_comparison_op() {
@@ -372,14 +378,18 @@ impl Parser {
 }
 
 impl Parser {
-    fn assignment(&mut self) -> Result<Expr> {
+    fn assignment(&mut self) -> Result<Expr, ParserError> {
         // Check for `let`
         if self.match_token(&Token::KeywordLet) {
             if let Some(Token::Identifier(name)) = self.peek().cloned() {
                 self.advance(); // consume identifier
 
                 if !self.match_token(&Token::Equals) {
-                    return Err(anyhow!("Expected '=' after identifier in let declaration"));
+                    return Err(ParserError::ExpectedAfterCustom(
+                        "=".into(),
+                        "".into(),
+                        "identifier".into(),
+                    ));
                 }
 
                 let value = self.assignment()?;
@@ -388,7 +398,10 @@ impl Parser {
                     value: Box::new(value),
                 });
             } else {
-                return Err(anyhow!("Expected identifier after 'let'"));
+                return Err(ParserError::ExpectedAfter(
+                    "identifier".into(),
+                    "let".into(),
+                ));
             }
         }
 
@@ -402,7 +415,9 @@ impl Parser {
                     value: Box::new(value),
                 });
             }
-            return Err(anyhow!("Invalid assignment target"));
+            return Err(ParserError::InvalidAssignment(
+                "target must be an identifier".into(),
+            ));
         }
 
         Ok(expr)
@@ -410,31 +425,36 @@ impl Parser {
 }
 
 impl Parser {
-    fn if_else(&mut self) -> Result<Expr> {
+    fn if_else(&mut self) -> Result<Expr, ParserError> {
         if !self.match_token(&Token::KeywordIf) {
-            return Err(anyhow!("Expected 'if' keyword"));
+            return Err(ParserError::ExpectedToken("if".into()));
         }
 
-        let condition = self.expression()?;
+        let condition_expr = self.expression()?;
+        let condition = Box::new(condition_expr);
 
         if !self.match_token(&Token::LeftBrace) {
-            return Err(anyhow!("Expected '{{' after 'if' condition"));
+            return Err(ParserError::ExpectedAfter(
+                "{".into(),
+                "if condition".into(),
+            ));
         }
 
+        // Removed the duplicate LeftBrace consumption here
         let mut then_statements = Vec::new();
         while !self.match_token(&Token::RightBrace) && !self.is_at_end() {
             then_statements.push(self.statement()?);
         }
 
         if self.previous() != Some(&Token::RightBrace) {
-            return Err(anyhow!("Expected '}}' after 'if' block"));
+            return Err(ParserError::ExpectedAfter("}".into(), "if-block".into()));
         }
 
         let then_branch = Expr::Block(then_statements);
 
         let else_branch = if self.match_token(&Token::KeywordElse) {
             if !self.match_token(&Token::LeftBrace) {
-                return Err(anyhow!("Expected '{{' after 'else'"));
+                return Err(ParserError::ExpectedAfter("{".into(), "else".into()));
             }
 
             let mut else_statements = Vec::new();
@@ -443,7 +463,7 @@ impl Parser {
             }
 
             if self.previous() != Some(&Token::RightBrace) {
-                return Err(anyhow!("Expected '}}' after 'else' block"));
+                return Err(ParserError::ExpectedAfter("}".into(), "else-block".into()));
             }
 
             Some(Box::new(Expr::Block(else_statements)))
@@ -452,7 +472,7 @@ impl Parser {
         };
 
         Ok(Expr::IfElse {
-            condition: Box::new(condition),
+            condition,
             then_branch: Box::new(then_branch),
             else_branch,
         })
@@ -471,7 +491,7 @@ mod tests {
         assert_eq!(
             statements[0],
             Expr::LetDeclaration {
-                identifier: "x".to_string(),
+                identifier: "x".into(),
                 value: Box::new(Expr::Literal(Nodes::new_integer(10))),
             }
         );
@@ -485,7 +505,7 @@ mod tests {
         assert_eq!(
             statements[0],
             Expr::Assignment {
-                identifier: "x".to_string(),
+                identifier: "x".into(),
                 value: Box::new(Expr::Literal(Nodes::new_integer(10))),
             }
         );
@@ -501,7 +521,7 @@ mod tests {
         assert_eq!(
             statements[0],
             Expr::LetDeclaration {
-                identifier: "x".to_string(),
+                identifier: "x".into(),
                 value: Box::new(Expr::Literal(Nodes::Integer(10))),
             }
         );
@@ -509,7 +529,7 @@ mod tests {
         assert_eq!(
             statements[1],
             Expr::LetDeclaration {
-                identifier: "y".to_string(),
+                identifier: "y".into(),
                 value: Box::new(Expr::Literal(Nodes::new_integer(20))),
             }
         );
@@ -517,9 +537,9 @@ mod tests {
         assert_eq!(
             statements[2],
             Expr::Binary {
-                left: Box::new(Expr::Literal(Nodes::new_identifier("x".to_string()))),
+                left: Box::new(Expr::Literal(Nodes::new_identifier("x".into()))),
                 operator: BinaryOp::Add,
-                right: Box::new(Expr::Literal(Nodes::new_identifier("y".to_string()))),
+                right: Box::new(Expr::Literal(Nodes::new_identifier("y".into()))),
             }
         );
     }
@@ -554,9 +574,9 @@ mod tests {
             assert_eq!(
                 **condition,
                 Expr::Binary {
-                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".into()))),
                     operator: BinaryOp::Equal,
-                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".to_string()))),
+                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".into()))),
                 }
             );
             if let Expr::Block(block_statements) = then_branch.as_ref() {
@@ -586,9 +606,9 @@ mod tests {
             assert_eq!(
                 **condition,
                 Expr::Binary {
-                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                    left: Box::new(Expr::Literal(Nodes::new_identifier("cond1".into()))),
                     operator: BinaryOp::Equal,
-                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".to_string()))),
+                    right: Box::new(Expr::Literal(Nodes::new_identifier("cond2".into()))),
                 }
             );
             if let Expr::Block(block_statements) = then_branch.as_ref() {
@@ -626,7 +646,7 @@ mod tests {
                 **condition,
                 Expr::Unary {
                     operator: UnaryOp::Not,
-                    operand: Box::new(Expr::Literal(Nodes::new_identifier("cond1".to_string()))),
+                    operand: Box::new(Expr::Literal(Nodes::new_identifier("cond1".into()))),
                 }
             );
             if let Expr::Block(block_statements) = then_branch.as_ref() {
@@ -645,5 +665,12 @@ mod tests {
         } else {
             panic!("Expected if expression");
         }
+    }
+
+    #[test]
+    fn invalid_char_should_panic() {
+        let result = Parser::new(String::from("@"));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ParserError::UnexpectedCharacter('@'));
     }
 }
