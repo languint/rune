@@ -89,4 +89,12 @@ pub enum Token {
     KeywordIf,
     #[token("else")]
     KeywordElse,
+    #[token("while")]
+    KeywordWhile,
+    #[token("for")]
+    KeywordFor,
+    #[token("->")]
+    Arrow,
+    #[token("=>")]
+    BigArrow,
 }
