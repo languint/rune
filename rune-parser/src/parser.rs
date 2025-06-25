@@ -404,36 +404,37 @@ mod tests {
 
     #[test]
     fn test_let_declaration() {
-        let mut parser = Parser::new(String::from("let x = 10")).unwrap();
-        let statements = parser.parse().unwrap();
+        let mut parser = Parser::new(String::from("let x = 10")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
         assert_eq!(statements.len(), 1);
         assert_eq!(
             statements[0],
             Expr::LetDeclaration {
                 identifier: "x".to_string(),
-                value: Box::new(Expr::Literal(Nodes::Integer(10))),
+                value: Box::new(Expr::Literal(Nodes::new_integer(10))),
             }
         );
     }
 
     #[test]
     fn test_assignment() {
-        let mut parser = Parser::new(String::from("x = 10")).unwrap();
-        let statements = parser.parse().unwrap();
+        let mut parser = Parser::new(String::from("x = 10")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
         assert_eq!(statements.len(), 1);
         assert_eq!(
             statements[0],
             Expr::Assignment {
                 identifier: "x".to_string(),
-                value: Box::new(Expr::Literal(Nodes::Integer(10))),
+                value: Box::new(Expr::Literal(Nodes::new_integer(10))),
             }
         );
     }
 
     #[test]
     fn test_multiple_statements_with_semicolons() {
-        let mut parser = Parser::new(String::from("let x = 10; let y = 20; x + y")).unwrap();
-        let statements = parser.parse().unwrap();
+        let mut parser =
+            Parser::new(String::from("let x = 10; let y = 20; x + y")).expect("Expected Parser");
+        let statements = parser.parse().expect("Expected statements");
         assert_eq!(statements.len(), 3);
 
         assert_eq!(
@@ -448,16 +449,16 @@ mod tests {
             statements[1],
             Expr::LetDeclaration {
                 identifier: "y".to_string(),
-                value: Box::new(Expr::Literal(Nodes::Integer(20))),
+                value: Box::new(Expr::Literal(Nodes::new_integer(20))),
             }
         );
 
         assert_eq!(
             statements[2],
             Expr::Binary {
-                left: Box::new(Expr::Literal(Nodes::Identifier("x".to_string()))),
+                left: Box::new(Expr::Literal(Nodes::new_identifier("x".to_string()))),
                 operator: BinaryOp::Add,
-                right: Box::new(Expr::Literal(Nodes::Identifier("y".to_string()))),
+                right: Box::new(Expr::Literal(Nodes::new_identifier("y".to_string()))),
             }
         );
     }
