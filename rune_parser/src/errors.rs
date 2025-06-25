@@ -25,21 +25,21 @@ impl fmt::Debug for ParserError {
 
 pub fn get_print_error(error: &ParserError) -> String {
     match error {
-        ParserError::UnexpectedCharacter(c) => format!("(E001): Unexpected character `{}`", c),
-        ParserError::UnexpectedToken(token) => format!("(E002): Unexpected token `{}`", token),
-        ParserError::UnexpectedEndOfInput => "(E003): Unexpected end of input".to_string(),
-        ParserError::ExpectedToken(token) => format!("(E004): Expected token `{}`", token),
+        ParserError::UnexpectedCharacter(c) => format!("(P001): Unexpected character `{}`", c),
+        ParserError::UnexpectedToken(token) => format!("(P002): Unexpected token `{}`", token),
+        ParserError::UnexpectedEndOfInput => "(P003): Unexpected end of input".to_string(),
+        ParserError::ExpectedToken(token) => format!("(P004): Expected token `{}`", token),
         ParserError::ExpectedAfter(expected, found) => {
-            format!("(E005): Expected `{}` after `{}`", expected, found)
+            format!("(P005): Expected `{}` after `{}`", expected, found)
         }
         ParserError::ExpectedAfterCustom(expected, found, message) => {
             format!(
-                "(E005): Expected `{}` after `{}` {}",
+                "(P005): Expected `{}` after `{}` {}",
                 expected, found, message
             )
         }
         ParserError::InvalidAssignment(message) => {
-            format!("(E006): Invalid assignment {}", message)
+            format!("(P006): Invalid assignment {}", message)
         }
     }
 }

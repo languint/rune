@@ -1,6 +1,6 @@
-use crate::errors::{ParserError, get_print_error};
+use crate::errors::ParserError;
+use crate::nodes::Nodes;
 use crate::tokens::Token;
-use crate::{errors, nodes::Nodes};
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,6 +29,53 @@ pub enum Expr {
         else_branch: Option<Box<Expr>>,
     },
     Block(Vec<Expr>),
+}
+
+impl ToString for Expr {
+    fn to_string(&self) -> String {
+        match self {
+            Expr::Literal(node) => format!("{:?}", node),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => format!(
+                "({} {} {})",
+                left.to_string(),
+                format!("{:?}", operator),
+                right.to_string()
+            ),
+            Expr::Unary { operator, operand } => {
+                format!("{}{}", format!("{:?}", operator), operand.to_string())
+            }
+            Expr::Assignment { identifier, value } => {
+                format!("{} = {}", identifier, value.to_string())
+            }
+            Expr::LetDeclaration { identifier, value } => {
+                format!("let {} = {}", identifier, value.to_string())
+            }
+            Expr::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => format!(
+                "if {} {{ {} }} else {{ {} }}",
+                condition.to_string(),
+                then_branch.to_string(),
+                else_branch
+                    .as_ref()
+                    .map_or("".to_string(), |e| e.to_string())
+            ),
+            Expr::Block(exprs) => format!(
+                "{{ {} }}",
+                exprs
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join("; ")
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
