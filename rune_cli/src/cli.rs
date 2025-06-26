@@ -1,4 +1,4 @@
-use std::{env, fmt::format, fs, path::PathBuf, process};
+use std::{env, fs, path::PathBuf};
 
 use clap::{Parser, Subcommand, command};
 use owo_colors::OwoColorize;
@@ -34,9 +34,10 @@ pub fn print_section(label: &str, depth: usize) {
 #[inline]
 pub fn print_error(error: &str, depth: usize) {
     println!(
-        "{}{} {}",
+        "{}{}{} {}",
         " ".repeat(depth),
-        "error".bold().red(),
+        "Error".bold().red(),
+        ":".bold(),
         error.red()
     );
 }
@@ -68,4 +69,16 @@ pub fn get_current_directory() -> Result<std::path::PathBuf, CliError> {
 pub fn make_folder(current_dir: &PathBuf, name: &str) -> Result<(), CliError> {
     fs::create_dir_all(current_dir.join(name))
         .map_err(|e| CliError::IOError(format!("Failed to create folder: {}", e)))
+}
+
+pub fn folder_exists(current_dir: &PathBuf, name: &str) -> Result<(), CliError> {
+    let path = current_dir.join(name);
+
+    match path.exists() {
+        true => Ok(()),
+        false => Err(CliError::IOError(format!(
+            "Folder {} does not exist!",
+            name
+        ))),
+    }
 }

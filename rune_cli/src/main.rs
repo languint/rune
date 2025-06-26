@@ -62,4 +62,12 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
         print_value("Title", config.title.as_str(), 5);
         print_value("Version", config.version.as_str(), 5);
     }
+
+    let source_dir = config.build.source_dir.or(Some("src".into())).unwrap();
+    let target_dir = config.build.target_dir.or(Some("target".into())).unwrap();
+
+    if let Err(err) = cli::folder_exists(current_dir, source_dir.as_str()) {
+        print_error(err.to_string().as_str(), 0);
+        process::exit(1);
+    }
 }
