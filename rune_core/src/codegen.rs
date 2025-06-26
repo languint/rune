@@ -6,11 +6,10 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue};
-use rune_parser::nodes::Nodes;
-use rune_parser::parser::BinaryOp;
-use rune_parser::parser::Expr;
-use rune_parser::parser::Types;
-use rune_parser::parser::UnaryOp;
+use rune_parser::parser::expr::Expr;
+use rune_parser::parser::nodes::Nodes;
+use rune_parser::parser::ops::{BinaryOp, UnaryOp};
+use rune_parser::parser::types::Types;
 use std::collections::HashMap;
 
 use crate::errors::CodeGenError;

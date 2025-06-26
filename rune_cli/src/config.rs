@@ -58,17 +58,3 @@ pub fn find_target_files(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
         Vec::new()
     }
 }
-
-fn get_something(key: usize) -> Option<i32> {
-    let values = vec![1, 2, 3, 4, 5, 6, 7];
-
-    values.get(key).map(|v| *v)
-}
-
-fn main() {
-    if let Some(value) = get_something(3) {
-        println!("Something: {}", value)
-    } else {
-        println!("Something not found")
-    };
-}

@@ -89,15 +89,3 @@ pub fn read_file(file_path: &PathBuf) -> Result<String, CliError> {
 
     Ok(content)
 }
-
-pub fn get_file_contents(file_path: &PathBuf) -> Result<String, CliError> {
-    let content = fs::read_to_string(file_path)
-        .map_err(|e| CliError::IOError(format!("Failed to read file: {}", e)))?;
-
-    Ok(content)
-}
-
-pub fn write_file(file_path: &PathBuf, content: &str) -> Result<(), CliError> {
-    fs::write(file_path, content)
-        .map_err(|e| CliError::IOError(format!("Failed to write file: {}", e)))
-}

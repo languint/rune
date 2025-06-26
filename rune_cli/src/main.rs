@@ -13,7 +13,7 @@ use inkwell::{
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
 };
 use owo_colors::OwoColorize;
-use rune_parser::parser;
+use rune_parser::parser::parser;
 
 use crate::{
     cli::{Cli, CliCommand, print_error, print_section, print_value, print_warning, read_file},

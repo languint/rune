@@ -5,7 +5,6 @@ pub enum Nodes {
     String(String),
     Boolean(bool),
     Identifier(String),
-    // Reference(Box<Nodes>),
 }
 
 impl Nodes {
@@ -29,8 +28,4 @@ impl Nodes {
     pub fn new_identifier(value: String) -> Self {
         Nodes::Identifier(value)
     }
-    // #[inline]
-    // pub fn new_reference(value: Nodes) -> Self {
-    //     Nodes::Reference(Box::new(value))
-    // }
 }
