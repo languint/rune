@@ -3,7 +3,6 @@ use std::fmt::{self};
 #[derive(PartialEq)]
 pub enum CliError {
     InternalError(String),
-    FolderCreationError(String),
     InvalidConfig(String),
     IOError(String),
 }
@@ -23,8 +22,7 @@ impl ToString for CliError {
 pub fn get_print_error(error: &CliError) -> String {
     match error {
         CliError::InternalError(msg) => format!("(C000): Internal error: {}", msg),
-        CliError::FolderCreationError(msg) => format!("(C001): Folder creation error: {}", msg),
-        CliError::InvalidConfig(msg) => format!("(C002): Invalid configuration: {}", msg),
-        CliError::IOError(msg) => format!("(C003): IO error: {}", msg),
+        CliError::InvalidConfig(msg) => format!("(C001): Invalid configuration: {}", msg),
+        CliError::IOError(msg) => format!("(C002): IO error: {}", msg),
     }
 }

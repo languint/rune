@@ -35,7 +35,7 @@ pub fn get_config(current_directory: &PathBuf) -> Result<Config, CliError> {
     Ok(config)
 }
 
-pub fn find_target_files(dir: PathBuf, extension: &str) -> Vec<PathBuf> {
+pub fn find_target_files(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
     if dir.is_dir() {
         let mut files = Vec::new();
         for entry in fs::read_dir(dir)
@@ -50,7 +50,7 @@ pub fn find_target_files(dir: PathBuf, extension: &str) -> Vec<PathBuf> {
             if path.is_file() && path.extension().map_or(false, |ext| ext == extension) {
                 files.push(path);
             } else if path.is_dir() {
-                files.extend(find_target_files(path, extension));
+                files.extend(find_target_files(&path, extension));
             }
         }
         files

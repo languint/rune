@@ -6,7 +6,7 @@ use owo_colors::OwoColorize;
 use crate::errors::CliError;
 
 #[derive(Subcommand, Debug, Clone)]
-pub enum Command {
+pub enum CliCommand {
     Build,
 }
 
@@ -14,7 +14,7 @@ pub enum Command {
 #[command(author = "longuint", about = "Rune CLI", version = "0.1.0")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: CliCommand,
     #[arg(short, long)]
     pub verbose: bool,
     #[arg(short, long)]
@@ -81,4 +81,23 @@ pub fn folder_exists(current_dir: &PathBuf, name: &str) -> Result<(), CliError> 
             name
         ))),
     }
+}
+
+pub fn read_file(file_path: &PathBuf) -> Result<String, CliError> {
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| CliError::IOError(format!("Failed to read file: {}", e)))?;
+
+    Ok(content)
+}
+
+pub fn get_file_contents(file_path: &PathBuf) -> Result<String, CliError> {
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| CliError::IOError(format!("Failed to read file: {}", e)))?;
+
+    Ok(content)
+}
+
+pub fn write_file(file_path: &PathBuf, content: &str) -> Result<(), CliError> {
+    fs::write(file_path, content)
+        .map_err(|e| CliError::IOError(format!("Failed to write file: {}", e)))
 }

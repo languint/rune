@@ -309,8 +309,10 @@ name = "rune_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "inkwell",
  "owo-colors",
  "rune_core",
+ "rune_parser",
  "serde",
  "toml",
 ]
