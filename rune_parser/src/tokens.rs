@@ -16,6 +16,8 @@ pub enum Token {
     Percent,
     #[token("&")]
     Ampersand,
+    #[token(",")]
+    Comma,
 
     // Assignment and equality
     #[token("=")]

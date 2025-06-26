@@ -43,6 +43,11 @@ pub enum Expr {
     },
     Block(Vec<Expr>),
     Print(Box<Expr>),
+    MethodCall {
+        target: Box<Expr>,
+        method_name: String,
+        arguments: Vec<Expr>,
+    },
 }
 
 impl Display for Expr {
@@ -90,6 +95,21 @@ impl Display for Expr {
                     .join("; ")
             ),
             Expr::Print(expr) => write!(f, "print {}", expr),
+            Expr::MethodCall {
+                target,
+                method_name,
+                arguments,
+            } => write!(
+                f,
+                "{}.{}({})",
+                target,
+                method_name,
+                arguments
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }

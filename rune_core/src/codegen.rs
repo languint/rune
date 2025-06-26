@@ -119,6 +119,11 @@ impl<'ctx> CodeGen<'ctx> {
             } => self.compile_if_else(condition, then_branch, else_branch),
             Expr::Block(statements) => self.compile_block(statements),
             Expr::Print(expr) => self.compile_print(expr),
+            Expr::MethodCall {
+                target,
+                method_name,
+                arguments,
+            } => todo!(),
         }
     }
 
@@ -616,7 +621,6 @@ impl<'ctx> CodeGen<'ctx> {
             }
         };
 
-        // Call the puts function
         let call_result = self
             .builder
             .build_call(puts_fn, &[printed_val_i8_ptr.into()], "puts_call")
@@ -658,9 +662,7 @@ mod tests {
 
         let result = codegen.module.verify();
 
-        dbg!(&result);
         if !result.is_ok() {
-            dbg!(result.unwrap_err());
             panic!("Module verification failed");
         }
     }
