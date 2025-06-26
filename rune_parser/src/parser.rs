@@ -42,6 +42,7 @@ pub enum Expr {
         else_branch: Option<Box<Expr>>,
     },
     Block(Vec<Expr>),
+    Print(Box<Expr>),
 }
 
 impl Display for Expr {
@@ -88,6 +89,7 @@ impl Display for Expr {
                     .collect::<Vec<String>>()
                     .join("; ")
             ),
+            Expr::Print(expr) => write!(f, "print {}", expr),
         }
     }
 }
@@ -216,6 +218,9 @@ impl Parser {
     fn expression(&mut self) -> Result<Expr, ParserError> {
         if let Some(Token::KeywordIf) = self.peek() {
             return self.if_else();
+        }
+        if let Some(Token::KeywordPrint) = self.peek() {
+            return self.print();
         }
         self.assignment()
     }
@@ -562,7 +567,6 @@ impl Parser {
             ));
         }
 
-        // Removed the duplicate LeftBrace consumption here
         let mut then_statements = Vec::new();
         while !self.match_token(&Token::RightBrace) && !self.is_at_end() {
             then_statements.push(self.statement()?);
@@ -598,6 +602,37 @@ impl Parser {
             then_branch: Box::new(then_branch),
             else_branch,
         })
+    }
+}
+
+impl Parser {
+    fn print(&mut self) -> Result<Expr, ParserError> {
+        if self.match_token(&Token::KeywordPrint) {
+            if let Some(Token::LeftParen) = self.peek().cloned() {
+                self.advance(); // consume `(`
+
+                let expr = self.or()?;
+
+                if let Some(Token::RightParen) = self.peek().cloned() {
+                    self.advance(); // consume `)`
+                } else {
+                    return Err(ParserError::ExpectedAfterCustom(
+                        ")".into(),
+                        "print".into(),
+                        "expression".into(),
+                    ));
+                }
+
+                return Ok(Expr::Print(Box::new(expr)));
+            } else {
+                return Err(ParserError::ExpectedAfter("(".into(), "print".into()));
+            };
+        } else {
+            Err(ParserError::ExpectedAfter(
+                "print".into(),
+                "statement".into(),
+            ))
+        }
     }
 }
 

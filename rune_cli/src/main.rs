@@ -155,7 +155,7 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
             "generic",
             "",
             OptimizationLevel::Default,
-            RelocMode::Default,
+            RelocMode::PIC,
             CodeModel::Default,
         );
 

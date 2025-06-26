@@ -95,6 +95,8 @@ pub enum Token {
     KeywordWhile,
     #[token("for")]
     KeywordFor,
+    #[token("print")]
+    KeywordPrint,
     #[token("->")]
     Arrow,
     #[token("=>")]

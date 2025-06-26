@@ -21,16 +21,7 @@ pub struct CodeGen<'ctx> {
     pub builder: Builder<'ctx>,
     variables: HashMap<String, (PointerValue<'ctx>, BasicTypeEnum<'ctx>)>,
     function: Option<FunctionValue<'ctx>>,
-}
-
-impl<'ctx> CodeGen<'ctx> {
-    pub fn print_ir(&self) {
-        self.module.print_to_stderr();
-    }
-
-    pub fn get_ir_string(&self) -> String {
-        self.module.print_to_string().to_string()
-    }
+    puts_fn: Option<FunctionValue<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -44,6 +35,7 @@ impl<'ctx> CodeGen<'ctx> {
             builder,
             variables: HashMap::new(),
             function: None,
+            puts_fn: None,
         }
     }
 
@@ -55,6 +47,15 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.builder.position_at_end(basic_block);
         self.function = Some(function);
+        self.declare_puts_function();
+    }
+
+    fn declare_puts_function(&mut self) {
+        let i32_type = self.context.i32_type();
+        let i8_ptr_type = self.context.ptr_type(AddressSpace::default());
+        let puts_fn_type = i32_type.fn_type(&[i8_ptr_type.into()], false);
+        let puts_fn = self.module.add_function("puts", puts_fn_type, None);
+        self.puts_fn = Some(puts_fn);
     }
 }
 
@@ -117,6 +118,7 @@ impl<'ctx> CodeGen<'ctx> {
                 else_branch,
             } => self.compile_if_else(condition, then_branch, else_branch),
             Expr::Block(statements) => self.compile_block(statements),
+            Expr::Print(expr) => self.compile_print(expr),
         }
     }
 
@@ -575,6 +577,55 @@ impl<'ctx> CodeGen<'ctx> {
     }
 }
 
+// Display
+impl<'ctx> CodeGen<'ctx> {
+    pub fn print_ir(&self) {
+        self.module.print_to_stderr();
+    }
+
+    pub fn get_ir_string(&self) -> String {
+        self.module.print_to_string().to_string()
+    }
+}
+
+// Print
+impl<'ctx> CodeGen<'ctx> {
+    fn compile_print(&mut self, value: &Expr) -> Result<BasicValueEnum<'ctx>, CodeGenError> {
+        let printed_val = self.compile_expression(value)?;
+
+        let puts_fn = self.puts_fn.ok_or(CodeGenError::InternalError(
+            "puts function not declared".to_string(),
+        ))?;
+
+        let printed_val_i8_ptr: BasicValueEnum<'ctx> = match printed_val {
+            BasicValueEnum::PointerValue(ptr_val) => ptr_val.into(),
+            BasicValueEnum::IntValue(int_val) => {
+                // If it's an integer, we need to convert it to a string.
+                // This is a simplified approach, for a robust solution you'd
+                // likely need a runtime function to convert integers to strings.
+                // For now, let's assume we are printing string literals directly.
+                // If you want to print integers, you'd need `sprintf` or similar.
+                return Err(CodeGenError::TypeMismatchCustom(
+                    "Printing integers directly not supported yet. Only strings.".to_string(),
+                ));
+            }
+            _ => {
+                return Err(CodeGenError::TypeMismatchCustom(
+                    "Only strings can be printed directly for now.".to_string(),
+                ));
+            }
+        };
+
+        // Call the puts function
+        let call_result = self
+            .builder
+            .build_call(puts_fn, &[printed_val_i8_ptr.into()], "puts_call")
+            .unwrap();
+
+        Ok(call_result.try_as_basic_value().left().unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,5 +703,28 @@ mod tests {
             dbg!(result.unwrap_err());
             panic!("Module verification failed");
         }
+    }
+
+    #[test]
+    fn test_print_string() {
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "test_print");
+
+        let mut parser = Parser::new("print \"Hello, World!\"".to_string()).unwrap();
+        let statements = parser.parse().unwrap();
+
+        codegen.compile_statements(&statements).unwrap();
+
+        let result = codegen.module.verify();
+
+        dbg!(&result);
+        if !result.is_ok() {
+            dbg!(result.unwrap_err());
+            panic!("Module verification failed");
+        }
+
+        let ir_string = codegen.get_ir_string();
+        assert!(ir_string.contains("@puts"));
+        assert!(ir_string.contains("call i32 @puts"));
     }
 }
