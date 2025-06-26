@@ -24,6 +24,16 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
+    pub fn print_ir(&self) {
+        self.module.print_to_stderr();
+    }
+
+    pub fn get_ir_string(&self) -> String {
+        self.module.print_to_string().to_string()
+    }
+}
+
+impl<'ctx> CodeGen<'ctx> {
     pub fn new(context: &'ctx Context, module_name: &str) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
@@ -46,7 +56,10 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(basic_block);
         self.function = Some(function);
     }
+}
 
+// Core
+impl<'ctx> CodeGen<'ctx> {
     pub fn compile_statements(&mut self, statements: &[Expr]) -> Result<(), CodeGenError> {
         if self.function.is_none() {
             self.create_main_function();
@@ -135,7 +148,10 @@ impl<'ctx> CodeGen<'ctx> {
             ))),
         }
     }
+}
 
+// Operations
+impl<'ctx> CodeGen<'ctx> {
     fn compile_binary_op(
         &mut self,
         left: &Expr,
@@ -403,7 +419,10 @@ impl<'ctx> CodeGen<'ctx> {
             },
         }
     }
+}
 
+// Assignments
+impl<'ctx> CodeGen<'ctx> {
     fn compile_assignment(
         &mut self,
         identifier: &str,
@@ -451,7 +470,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         Ok(val)
     }
+}
 
+// If-Else
+impl<'ctx> CodeGen<'ctx> {
     fn compile_if_else(
         &mut self,
         condition: &Expr,
@@ -538,7 +560,10 @@ impl<'ctx> CodeGen<'ctx> {
             Ok(then_val)
         }
     }
+}
 
+// Block
+impl<'ctx> CodeGen<'ctx> {
     fn compile_block(&mut self, statements: &[Expr]) -> Result<BasicValueEnum<'ctx>, CodeGenError> {
         let mut last_val = self.context.i64_type().const_int(0, false).into();
 
@@ -547,14 +572,6 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         Ok(last_val)
-    }
-
-    pub fn print_ir(&self) {
-        self.module.print_to_stderr();
-    }
-
-    pub fn get_ir_string(&self) -> String {
-        self.module.print_to_string().to_string()
     }
 }
 
