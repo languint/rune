@@ -3,6 +3,7 @@ use std::{
     io::Write,
     path::PathBuf,
     process::{self, Command},
+    time::Instant,
 };
 
 use clap::Parser;
@@ -100,6 +101,7 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
 
     println!("{} {} target(s).", "Found".bold().green(), targets.len());
 
+    let start = Instant::now();
     for target_file in targets {
         let source = read_file(&source_dir.join(&target_file));
 
@@ -210,7 +212,7 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
         // Use a C compiler (like gcc or clang) to link the object file into an executable
         let output = Command::new("cc") // common alias for the system's C compiler
             .arg(&obj_path)
-            .arg("-o") // Specify the output file name
+            .arg("-o")
             .arg(&bin_path)
             .output();
 
@@ -237,10 +239,16 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
             }
         }
 
-        println!(
-            "Successfully compiled {} to an executable: {}",
-            file_name.bold(),
-            bin_path.display().underline()
+        println!("{} `{}`.", "Compiled".bold().yellow(), file_name.bold(),);
+    }
+    let end = Instant::now();
+    let duration = end - start;
+
+    if log_level == LogLevel::Verbose {
+        print_value(
+            "Compile Duration",
+            format!("{}ms", duration.as_millis()).as_str(),
+            0,
         );
     }
 }
