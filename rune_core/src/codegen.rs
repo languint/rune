@@ -603,7 +603,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         let printed_val_i8_ptr: BasicValueEnum<'ctx> = match printed_val {
             BasicValueEnum::PointerValue(ptr_val) => ptr_val.into(),
-            BasicValueEnum::IntValue(int_val) => {
+            BasicValueEnum::IntValue(_int_val) => {
                 // If it's an integer, we need to convert it to a string.
                 // This is a simplified approach, for a robust solution you'd
                 // likely need a runtime function to convert integers to strings.

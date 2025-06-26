@@ -1,4 +1,4 @@
-use std::fmt::{self};
+use std::fmt::{self, Display};
 
 #[derive(PartialEq)]
 pub enum CliError {
@@ -13,9 +13,9 @@ impl fmt::Debug for CliError {
     }
 }
 
-impl ToString for CliError {
-    fn to_string(&self) -> String {
-        get_print_error(self)
+impl Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", get_print_error(self))
     }
 }
 

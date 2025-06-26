@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::Write,
-    path::PathBuf,
+    path::Path,
     process::{self, Command},
     time::Instant,
 };
@@ -13,10 +13,13 @@ use inkwell::{
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
 };
 use owo_colors::OwoColorize;
-use rune_parser::parser::parser;
+use rune_parser::parser;
 
 use crate::{
-    cli::{Cli, CliCommand, print_error, print_section, print_value, print_warning, read_file},
+    cli::{
+        Cli, CliCommand, make_folder, print_error, print_section, print_value, print_warning,
+        read_file,
+    },
     config::find_target_files,
     errors::CliError,
 };
@@ -62,10 +65,10 @@ fn main() {
     }
 }
 
-fn build(current_dir: &PathBuf, log_level: LogLevel) {
+fn build(current_dir: &Path, log_level: LogLevel) {
     println!("{} `build`", "Running".green().bold());
 
-    let config = config::get_config(&current_dir);
+    let config = config::get_config(current_dir);
 
     if config.is_err() {
         let err = config.unwrap_err();
@@ -81,12 +84,20 @@ fn build(current_dir: &PathBuf, log_level: LogLevel) {
         print_value("Version", config.version.as_str(), 5);
     }
 
-    let source_dir = config.build.source_dir.or(Some("src".into())).unwrap();
-    let target_dir = config.build.target_dir.or(Some("target".into())).unwrap();
+    let source_dir = config.build.source_dir.unwrap_or("src".into());
+    let target_dir = config.build.target_dir.unwrap_or("target".into());
 
     if let Err(err) = cli::folder_exists(current_dir, source_dir.as_str()) {
         print_error(err.to_string().as_str(), 0);
         process::exit(1);
+    }
+
+    if cli::folder_exists(current_dir, target_dir.as_str()).is_err() {
+        let result = make_folder(current_dir, "target");
+        if result.is_err() {
+            print_error(result.err().unwrap().to_string().as_str(), 0);
+            process::exit(1);
+        }
     }
 
     let source_dir = &current_dir.join(source_dir);

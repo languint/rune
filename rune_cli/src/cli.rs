@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::Path};
 
 use clap::{Parser, Subcommand, command};
 use owo_colors::OwoColorize;
@@ -66,12 +66,12 @@ pub fn get_current_directory() -> Result<std::path::PathBuf, CliError> {
     Ok(result.unwrap())
 }
 
-pub fn make_folder(current_dir: &PathBuf, name: &str) -> Result<(), CliError> {
+pub fn make_folder(current_dir: &Path, name: &str) -> Result<(), CliError> {
     fs::create_dir_all(current_dir.join(name))
         .map_err(|e| CliError::IOError(format!("Failed to create folder: {}", e)))
 }
 
-pub fn folder_exists(current_dir: &PathBuf, name: &str) -> Result<(), CliError> {
+pub fn folder_exists(current_dir: &Path, name: &str) -> Result<(), CliError> {
     let path = current_dir.join(name);
 
     match path.exists() {
@@ -83,7 +83,7 @@ pub fn folder_exists(current_dir: &PathBuf, name: &str) -> Result<(), CliError> 
     }
 }
 
-pub fn read_file(file_path: &PathBuf) -> Result<String, CliError> {
+pub fn read_file(file_path: &Path) -> Result<String, CliError> {
     let content = fs::read_to_string(file_path)
         .map_err(|e| CliError::IOError(format!("Failed to read file: {}", e)))?;
 

@@ -1,11 +1,14 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use toml::from_str;
 
 use crate::errors::CliError;
 
-pub fn get_config_file_path(current_directory: &PathBuf) -> PathBuf {
+pub fn get_config_file_path(current_directory: &Path) -> PathBuf {
     current_directory.join("Rune.toml")
 }
 
@@ -22,7 +25,7 @@ pub struct BuildConfig {
     pub target_dir: Option<String>,
 }
 
-pub fn get_config(current_directory: &PathBuf) -> Result<Config, CliError> {
+pub fn get_config(current_directory: &Path) -> Result<Config, CliError> {
     let config_path = get_config_file_path(current_directory);
 
     let config_str = fs::read_to_string(config_path).map_err(|err| {
@@ -47,7 +50,7 @@ pub fn find_target_files(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
                 .unwrap();
 
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == extension) {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == extension) {
                 files.push(path);
             } else if path.is_dir() {
                 files.extend(find_target_files(&path, extension));
